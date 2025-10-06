@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Portfolio Rebalancer v9.0 (USD)</title>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <style>
+        :root {
+            --primary-bg: #f8f9fa;
+            --secondary-bg: #ffffff;
+            --border-color: #dee2e6;
+            --text-color: #212529;
+            --primary-color: #007bff;
+            --hover-color: #0056b3;
+            --danger-color: #dc3545;
+            --danger-hover: #c82333;
+            --success-color: #28a745;
+            --success-hover: #218838;
+            --info-color: #6c757d;
+            --info-hover: #5a6268;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: var(--primary-bg);
+            color: var(--text-color);
+            line-height: 1.5;
+        }
+        .container {
+            max-width: 1700px;
+            margin: 0 auto;
+            background-color: var(--secondary-bg);
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+        h1 {
+            text-align: center;
+            color: var(--primary-color);
+            margin-bottom: 25px;
+        }
+        .controls-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 20px;
+            margin-bottom: 25px;
+            padding: 20px;
+            background-color: var(--primary-bg);
+            border-radius: 6px;
+            align-items: end;
+        }
+        .input-group, .strategy-group, .file-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .strategy-group div {
+            display: flex;
+            gap: 15px;
+        }
+        label, .group-title {
+            font-weight: 600;
+            font-size: 0.9em;
+        }
+        input[type="text"] {
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 1em;
+        }
+        button, .btn-label {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 1em;
+            transition: background-color 0.2s ease;
+            text-align: center;
+        }
+        .btn-calculate { background-color: var(--primary-color); color: white; }
+        .btn-calculate:hover { background-color: var(--hover-color); }
+        .btn-add { background-color: var(--success-color); color: white; }
+        .btn-add:hover { background-color: var(--success-hover); }
+        .btn-file { background-color: var(--info-color); color: white; }
+        .btn-file:hover { background-color: var(--info-hover); }
+        .btn-remove { background-color: var(--danger-color); color: white; font-size: 0.8em; padding: 5px 10px; }
+        .btn-remove:hover { background-color: var(--danger-hover); }
+        #calculate-btn-wrapper { grid-column: -1; }
+        .table-wrapper { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { padding: 12px; border: 1px solid var(--border-color); text-align: left; vertical-align: middle; }
+        th { background-color: var(--primary-bg); font-weight: 600; white-space: nowrap;}
+        tbody tr:nth-child(even) { background-color: #f8f9fa; }
+        td input { width: 95%; padding: 8px; border: 1px solid transparent; border-radius: 4px; box-sizing: border-box; }
+        td input:focus { border: 1px solid var(--primary-color); background-color: #fefefe; }
+        td input[type="text"]{ min-width: 120px; }
+        .result-cell { font-weight: 600; white-space: nowrap; }
+        .buy { color: var(--success-color); }
+        .sell { color: var(--danger-color); }
+        .info-cell { font-weight: bold; background-color: #f8f9fa; }
+        .summary { margin-top: 20px; padding: 15px; background-color: var(--primary-bg); border-radius: 6px; font-weight: 600; display: flex; justify-content: space-around; flex-wrap: wrap; gap: 20px; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>My Portfolio Rebalancer v9.0 (USD)</h1>
+
+        <div class="controls-grid">
+            <div class="input-group">
+                <label for="new-investment">New Investment Amount ($)</label>
+                <input type="text" id="new-investment" placeholder="e.g., 1,000.00">
+            </div>
+            <div class="input-group">
+                <label for="min-asset-value">Minimum Value per Asset ($)</label>
+                <input type="text" id="min-asset-value" placeholder="e.g., 500.00">
+            </div>
+            <div class="input-group">
+                <label for="min-transaction-value">Min. Transaction Value ($)</label>
+                <input type="text" id="min-transaction-value" placeholder="e.g., 10.00">
+            </div>
+            
+            <div class="strategy-group">
+                <span class="group-title">Rebalancing Strategy</span>
+                <div>
+                    <label><input type="radio" name="strategy" value="buySell" checked> Buy & Sell</label>
+                    <label><input type="radio" name="strategy" value="buyOnly"> Buy Only</label>
+                </div>
+            </div>
+            
+            <div class="strategy-group">
+                <span class="group-title">Rebalance by</span>
+                <div>
+                    <label><input type="radio" name="rebalance-by" value="quantity" checked> Quantity</label>
+                    <label><input type="radio" name="rebalance-by" value="value"> Value</label>
+                </div>
+            </div>
+
+            <div class="file-group">
+                <span class="group-title">Manage Portfolio</span>
+                <div style="display: flex; gap: 10px;">
+                    <label for="import-file" class="btn-label btn-file">Import (XLSX/JSON)</label>
+                    <input type="file" id="import-file" accept=".json,.xlsx" style="display: none;">
+                    <button class="btn-file" id="save-btn">Save (JSON)</button>
+                </div>
+            </div>
+            
+             <div id="calculate-btn-wrapper" class="input-group">
+                <span class="group-title">Actions</span>
+                 <div style="display: flex; gap: 10px;">
+                    <button class="btn-add" id="add-asset-btn">Add Asset</button>
+                    <button class="btn-calculate" id="calculate-btn">Calculate Rebalance</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Asset</th>
+                        <th>Current Qty</th>
+                        <th>Current Price</th>
+                        <th>Current Value</th>
+                        <th>Avg. Cost</th>
+                        <th>Total Cost</th>
+                        <th>Price Ceiling</th>
+                        <th>Qty to Buy</th>
+                        <th>Amount to Buy ($)</th>
+                        <th>Qty to Sell</th>
+                        <th>Amount to Sell ($)</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="asset-table-body"></tbody>
+            </table>
+        </div>
+        
+        <div id="summary" class="summary" style="display: none;"></div>
+
+    </div>
+
+    <script>
+    // --- FORMATTING AND PARSING FUNCTIONS (USD) ---
+
+    const parseNumber = (value) => {
+        if (typeof value === 'number') return value;
+        if (typeof value !== 'string' || value.trim() === '') return 0;
+        const cleaned = value.replace(/\$|\s/g, '').replace(/,/g, '');
+        return parseFloat(cleaned) || 0;
+    };
+
+    const formatNumberForDisplay = (number, minDecimals = 2, maxDecimals = 2) => {
+        return new Intl.NumberFormat('en-US', {
+            minimumFractionDigits: minDecimals,
+            maximumFractionDigits: maxDecimals
+        }).format(Number(number) || 0);
+    };
+
+    const formatCurrencyForDisplay = (value) => {
+        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(Number(value) || 0);
+    };
+
+    // --- CORE APPLICATION LOGIC ---
+
+    document.addEventListener('DOMContentLoaded', () => {
+        populateTable([]);
+        document.getElementById('add-asset-btn').addEventListener('click', () => addRow());
+        document.getElementById('calculate-btn').addEventListener('click', handleCalculate);
+        document.getElementById('save-btn').addEventListener('click', handleSave);
+        document.getElementById('import-file').addEventListener('change', handleFileImport);
+        tableBody.addEventListener('click', (event) => {
+            if (event.target.classList.contains('btn-remove')) {
+                event.target.closest('tr').remove();
+                summaryDiv.style.display = 'none';
+            }
+        });
+    });
+    
+    const tableBody = document.getElementById('asset-table-body');
+    const summaryDiv = document.getElementById('summary');
+
+    const addRow = (asset = {}) => {
+        const tr = document.createElement('tr');
+        const totalCost = (asset.currentQty || 0) * (asset.avgCost || 0);
+        const currentValue = (asset.currentQty || 0) * (asset.currentPrice || 0);
+
+        tr.innerHTML = `
+            <td><input type="text" class="asset-data" data-field="asset" value="${asset.asset || ''}"></td>
+            <td><input type="text" class="asset-data" data-field="currentQty" value="${formatNumberForDisplay(asset.currentQty, 0, 8)}"></td>
+            <td><input type="text" class="asset-data" data-field="currentPrice" value="${formatCurrencyForDisplay(asset.currentPrice)}"></td>
+            <td class="info-cell">${formatCurrencyForDisplay(currentValue)}</td>
+            <td><input type="text" class="asset-data" data-field="avgCost" value="${formatCurrencyForDisplay(asset.avgCost)}"></td>
+            <td class="info-cell">${formatCurrencyForDisplay(totalCost)}</td>
+            <td><input type="text" class="asset-data" data-field="priceCeiling" value="${formatCurrencyForDisplay(asset.priceCeiling)}"></td>
+            <td class="result-cell buy" data-result="qty-buy">0</td>
+            <td class="result-cell buy" data-result="amount-buy">$0.00</td>
+            <td class="result-cell sell" data-result="qty-sell">0</td>
+            <td class="result-cell sell" data-result="amount-sell">$0.00</td>
+            <td><button class="btn-remove">Remove</button></td>
+        `;
+        tableBody.appendChild(tr);
+    };
+
+    const populateTable = (data) => {
+        tableBody.innerHTML = '';
+        if (Array.isArray(data) && data.length > 0) {
+            data.forEach(asset => addRow(asset));
+        }
+    };
+    
+    const getAssetDataFromUI = () => {
+        const assets = [];
+        tableBody.querySelectorAll('tr').forEach(row => {
+            const asset = {};
+            row.querySelectorAll('.asset-data').forEach(input => {
+                const field = input.dataset.field;
+                asset[field] = (field === 'asset') ? input.value : parseNumber(input.value);
+            });
+            asset.currentValue = asset.currentQty * asset.currentPrice;
+            asset.rowElement = row;
+            assets.push(asset);
+        });
+        return assets;
+    };
+    
+    const handleCalculate = () => {
+        const assets = getAssetDataFromUI();
+        if (assets.length === 0) return alert("Please add at least one asset.");
+
+        // Clear previous results and update current values
+        assets.forEach(asset => {
+            asset.currentValue = asset.currentQty * asset.currentPrice;
+            const totalCost = asset.currentQty * asset.avgCost;
+            asset.rowElement.children[3].textContent = formatCurrencyForDisplay(asset.currentValue);
+            asset.rowElement.children[5].textContent = formatCurrencyForDisplay(totalCost);
+            
+            asset.rowElement.querySelector('[data-result="qty-buy"]').textContent = '0';
+            asset.rowElement.querySelector('[data-result="amount-buy"]').textContent = formatCurrencyForDisplay(0);
+            asset.rowElement.querySelector('[data-result="qty-sell"]').textContent = '0';
+            asset.rowElement.querySelector('[data-result="amount-sell"]').textContent = formatCurrencyForDisplay(0);
+        });
+        
+        const newInvestment = parseNumber(document.getElementById('new-investment').value);
+        const minAssetValue = parseNumber(document.getElementById('min-asset-value').value);
+        const minTransactionValue = parseNumber(document.getElementById('min-transaction-value').value);
+        const strategy = document.querySelector('input[name="strategy"]:checked').value;
+        const rebalanceBy = document.querySelector('input[name="rebalance-by"]:checked').value;
+
+        const totalCurrentValue = assets.reduce((sum, a) => sum + a.currentValue, 0);
+        const newTotalValue = totalCurrentValue + newInvestment;
+        const idealWeight = newTotalValue / assets.length;
+        const targetValuePerAsset = Math.max(idealWeight, minAssetValue);
+        
+        if (targetValuePerAsset * assets.length > newTotalValue && strategy === 'buyOnly') {
+             alert("Warning: The 'Minimum Value per Asset' is too high for the current total portfolio value and new investment. Results may not meet the minimum target for all assets.");
+        }
+
+        assets.forEach(a => {
+            a.targetValue = targetValuePerAsset;
+            a.isBelowCeiling = a.currentPrice <= a.priceCeiling || a.priceCeiling === 0;
+            a.difference = a.targetValue - a.currentValue;
+        });
+
+        if (strategy === 'buySell') {
+            const assetsToSell = assets.filter(a => a.difference < 0);
+            const assetsToBuy = assets.filter(a => a.difference > 0 && a.isBelowCeiling);
+            
+            // Phase 1: Calculate the actual funds generated from sales, respecting min transaction value.
+            let totalFundsFromSells = 0;
+            assetsToSell.forEach(asset => {
+                const diffToSell = Math.abs(asset.difference);
+                let qtyToSell = 0;
+                let amountToSell = 0;
+                
+                if (rebalanceBy === 'value') {
+                    amountToSell = diffToSell;
+                    qtyToSell = asset.currentPrice > 0 ? amountToSell / asset.currentPrice : 0;
+                } else { // quantity
+                    qtyToSell = asset.currentPrice > 0 ? Math.floor(diffToSell / asset.currentPrice) : 0;
+                    amountToSell = qtyToSell * asset.currentPrice;
+                }
+
+                if (amountToSell > minTransactionValue) {
+                    asset.rowElement.querySelector('[data-result="qty-sell"]').textContent = formatNumberForDisplay(qtyToSell, 0, 8);
+                    asset.rowElement.querySelector('[data-result="amount-sell"]').textContent = formatCurrencyForDisplay(amountToSell);
+                    totalFundsFromSells += amountToSell;
+                }
+            });
+
+            // Phase 2: Allocate available capital to fund the purchases.
+            const totalFundsForBuying = totalFundsFromSells + newInvestment;
+            const totalBuyTargetAmount = assetsToBuy.reduce((sum, a) => sum + a.difference, 0);
+
+            if (totalBuyTargetAmount > 0) {
+                const allocationRatio = Math.min(1, totalFundsForBuying / totalBuyTargetAmount);
+
+                assetsToBuy.forEach(asset => {
+                    const valueToInvest = asset.difference * allocationRatio;
+                    
+                    if (valueToInvest > 0) {
+                        let qtyToBuy = 0;
+                        let amountToBuy = 0;
+
+                        if (rebalanceBy === 'value') {
+                            amountToBuy = valueToInvest;
+                            qtyToBuy = asset.currentPrice > 0 ? amountToBuy / asset.currentPrice : 0;
+                        } else { // quantity
+                            qtyToBuy = asset.currentPrice > 0 ? Math.floor(valueToInvest / asset.currentPrice) : 0;
+                            amountToBuy = qtyToBuy * asset.currentPrice;
+                        }
+                        
+                        if (amountToBuy > minTransactionValue) {
+                            asset.rowElement.querySelector('[data-result="qty-buy"]').textContent = formatNumberForDisplay(qtyToBuy, 0, 8);
+                            asset.rowElement.querySelector('[data-result="amount-buy"]').textContent = formatCurrencyForDisplay(amountToBuy);
+                        }
+                    }
+                });
+            }
+        } else { // 'buyOnly' strategy
+            let investmentLeft = newInvestment;
+            const underweightAssets = assets
+                .filter(a => a.difference > 0 && a.isBelowCeiling)
+                .sort((a, b) => b.difference - a.difference);
+
+            underweightAssets.forEach(asset => {
+                if (investmentLeft <= minTransactionValue) return; 
+                const valueToInvest = Math.min(asset.difference, investmentLeft);
+                if (valueToInvest > 0) {
+                    let qtyToBuy = 0;
+                    let amountToBuy = 0;
+                    if (rebalanceBy === 'value') {
+                        amountToBuy = valueToInvest;
+                        qtyToBuy = asset.currentPrice > 0 ? amountToBuy / asset.currentPrice : 0;
+                    } else { // quantity
+                        qtyToBuy = asset.currentPrice > 0 ? Math.floor(valueToInvest / asset.currentPrice) : 0;
+                        amountToBuy = qtyToBuy * asset.currentPrice;
+                    }
+                    
+                    if (amountToBuy > minTransactionValue && amountToBuy <= investmentLeft) {
+                        investmentLeft -= amountToBuy;
+                        asset.rowElement.querySelector('[data-result="qty-buy"]').textContent = formatNumberForDisplay(qtyToBuy, 0, 8);
+                        asset.rowElement.querySelector('[data-result="amount-buy"]').textContent = formatCurrencyForDisplay(amountToBuy);
+                    }
+                }
+            });
+        }
+        
+        const totalBuys = assets.reduce((sum, a) => sum + parseNumber(a.rowElement.querySelector('[data-result="amount-buy"]').textContent), 0);
+        const totalSells = assets.reduce((sum, a) => sum + parseNumber(a.rowElement.querySelector('[data-result="amount-sell"]').textContent), 0);
+        summaryDiv.innerHTML = `
+            <span><strong>Current Value:</strong> ${formatCurrencyForDisplay(totalCurrentValue)}</span>
+            <span><strong>Value with Investment:</strong> ${formatCurrencyForDisplay(newTotalValue)}</span>
+            <span><strong>Target Value per Asset:</strong> ${formatCurrencyForDisplay(targetValuePerAsset)}</span>
+            <span><strong>Total Buys:</strong> ${formatCurrencyForDisplay(totalBuys)}</span>
+            <span><strong>Total Sells:</strong> ${formatCurrencyForDisplay(totalSells)}</span>
+        `;
+        summaryDiv.style.display = 'flex';
+    };
+
+    const handleSave = () => {
+        const data = getAssetDataFromUI().map(({ rowElement, currentValue, ...rest }) => rest);
+        if (data.length === 0) return alert("Nothing to save.");
+        const jsonString = JSON.stringify(data, null, 2);
+        const blob = new Blob([jsonString], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `portfolio-rebalancer-${new Date().toISOString().slice(0,10)}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
+    
+    const handleFileImport = (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        const fileExtension = file.name.split('.').pop().toLowerCase();
+
+        reader.onload = (e) => {
+            try {
+                let data;
+                if (fileExtension === 'json') {
+                    data = JSON.parse(e.target.result);
+                } else if (fileExtension === 'xlsx') {
+                    const workbook = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+                    const sheetName = workbook.SheetNames[0];
+                    const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { raw: false });
+                    data = mapXLSXData(jsonData);
+                } else {
+                    throw new Error("Unsupported file format. Please use .json or .xlsx.");
+                }
+                populateTable(data);
+            } catch (err) {
+                console.error(err);
+                alert(`Error reading the file: ${err.message}`);
+            }
+        };
+
+        if (fileExtension === 'json') {
+            reader.readAsText(file);
+        } else if (fileExtension === 'xlsx') {
+            reader.readAsArrayBuffer(file);
+        } else {
+             alert("Unsupported file format. Please use .json or .xlsx.");
+        }
+        event.target.value = ''; // Reset file input
+    };
+    
+    const mapXLSXData = (jsonData) => {
+        return jsonData.map(row => {
+            const newRow = {};
+            newRow.asset = row['Asset'] || row['Ticker'] || row['Product'];
+            newRow.currentQty = parseNumber(row['Current Qty'] || row['Qty'] || row['Quantity']);
+            newRow.currentPrice = parseNumber(row['Current Price'] || row['Price']);
+            newRow.avgCost = parseNumber(row['Avg. Cost'] || row['Average Cost']);
+            newRow.priceCeiling = parseNumber(row['Price Ceiling'] || row['Ceiling']);
+            return newRow;
+        }).filter(row => row.asset && row.currentQty > 0);
+    };
+    </script>
+</body>
+</html>
